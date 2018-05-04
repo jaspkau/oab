@@ -1,0 +1,2 @@
+data/otu_table_no_singletons_sintax.txt filter=lfs diff=lfs merge=lfs -text
+data/tax.sintax filter=lfs diff=lfs merge=lfs -text
