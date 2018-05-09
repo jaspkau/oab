@@ -1,0 +1,81 @@
+> decon = subset_samples(d, Source == "root")
+> decon
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 120964 taxa and 194 samples ]
+sample_data() Sample Data:       [ 194 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 120964 taxa by 7 taxonomic ranks ]
+> decon = subset_samples(decon, Species == "P. praeclara")
+> decon
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 120964 taxa and 120 samples ]
+sample_data() Sample Data:       [ 120 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 120964 taxa by 7 taxonomic ranks ]
+> decon = prune_taxa(taxa_sums(decon) >= 1, decon)
+> decon
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1233 taxa and 120 samples ]
+sample_data() Sample Data:       [ 120 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 1233 taxa by 7 taxonomic ranks ]
+> source("scripts/decontaminate_phyloseq.R")
+> 
+> d_r = subset_samples(decon.d, Sample_or_Control == "Sample")
+> d_r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1233 taxa and 118 samples ]
+sample_data() Sample Data:       [ 118 samples by 17 sample variables ]
+tax_table()   Taxonomy Table:    [ 1233 taxa by 7 taxonomic ranks ]
+> d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
+> d_r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1024 taxa and 118 samples ]
+sample_data() Sample Data:       [ 118 samples by 17 sample variables ]
+tax_table()   Taxonomy Table:    [ 1024 taxa by 7 taxonomic ranks ]
+
+##################################################Alpha diversity###################################
+
+> a = summary(aov(Simpson ~ Population + Year + Stage + Pop_size, data = temp))
+> a
+             Df Sum Sq Mean Sq F value Pr(>F)
+Population    7 0.0582 0.00832   0.463  0.859
+Year          1 0.0330 0.03302   1.837  0.178
+Stage         2 0.0261 0.01307   0.727  0.486
+Residuals   107 1.9234 0.01798               
+> p.ad = p.adjust(a[[1]]$`Pr(>F)`)
+> p.ad
+[1] 0.9715994 0.5344320 0.9715994        NA
+
+> ###PERMANOVA#############################################
+> 
+> ###Weighted distance
+> 
+> a = adonis2(dist_w ~ sample_data(d3)$Population + sample_data(d3)$Stage + as.factor(sample_data(d3)$Year), permutations = 999)
+> a
+Permutation test for adonis under reduced model
+Terms added sequentially (first to last)
+Permutation: free
+Number of permutations: 999
+
+adonis2(formula = dist_w ~ sample_data(d3)$Population + sample_data(d3)$Stage + as.factor(sample_data(d3)$Year), permutations = 999)
+                                 Df SumOfSqs      R2      F Pr(>F)    
+sample_data(d3)$Population        7    5.011 0.09800 1.7337  0.001 ***
+sample_data(d3)$Stage             2    1.569 0.03069 1.9004  0.001 ***
+as.factor(sample_data(d3)$Year)   1    0.786 0.01537 1.9038  0.001 ***
+Residual                        106   43.768 0.85594                  
+Total                           116   51.135 1.00000                  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> 
+> ###ajust P-values
+> p.adjust(a$`Pr(>F)`, method = "bonferroni")
+[1] 0.003 0.003 0.003    NA    NA
+
+#########################Total soil bacterial community
+
+> d_s
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 85321 taxa and 65 samples ]
+sample_data() Sample Data:       [ 65 samples by 18 sample variables ]
+tax_table()   Taxonomy Table:    [ 85321 taxa by 7 taxonomic ranks ]
+
+##############Soil analyses after selecting root OTUs from soil
+

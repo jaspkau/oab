@@ -1,95 +1,40 @@
-setwd("C://Users//jaspkaur//Google Drive//Metagenomics//pico_comb_run//pico/")
-
-setwd("C:/Users/jas/Google Drive/Metagenomics/pico_comb_run/pico (1)/")
-
-#source("/Users/administrator/Documents/jaspreet/pico/pico_comb_run/packages.r")
+setwd("C://Users//jaspkaur//Google Drive//Metagenomics//oab/")
+setwd("C:/Users/jaspr/Google Drive/Metagenomics/oab/")
 setwd("/Users/administrator/Documents/jaspreet/oab/oab/")
 
 library(phyloseq)
-
-###ROOT OMF ANALYSIS......................................
-# Make phyloseq object ----------------------------------------------------
-
-otu <- read.delim(file = "data/otu_table_no_singletons_sintax.txt", 
-                  sep = "\t", header = T)
-otu = otu[,-ncol(otu)]
-row.names(otu) = otu[,1]
-otu = otu[,-1]
-#Rarefy(otu, depth = min(rowSums(otu)))
-otu = otu[,colSums(otu) > 0]
-site_list = colnames(otu)
-otu_tab = otu_table(as.matrix(otu), taxa_are_rows = T)
-
-###Format SINTAX taxonomy table
-
 library(reshape2)
-
-tax = read.delim(file = "data/tax.sintax", sep = "\t", header = F)
-row.names(tax) = tax$V1
-list = tax$V2
-tax2 = colsplit(list, pattern ="\\(|\\),", c("Kingdom", "Kingdom_conf", "Phylum", "Phylum_conf", "Class", "Class_conf", "Order", "Order_conf", "Family", "Family_conf", "Genus", "Genus_conf", "Species", "Species_conf"))
-tax2$Species_conf = gsub("\\)", "", tax2$Species_conf)
-tax2$Species_conf = as.numeric(tax2$Species_conf)
-tax2[is.na(tax2)] <- 0
-row.names(tax2) = row.names(tax)
-
-source("scripts/tax_func.R") #90% conf
-level = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
-for (i in 1:7){ ###i 1 = kingdom, i 2 = phylum etc
-  tax2 = tax_assign(tax2, paste(level[i], "_conf", sep = ""), level[i])
-}
-
-tax2 = tax2[,-c(2,4,6,8,10,12,14)]
-
-tax2$row = row.names(tax2)
-tax2[,8:9] = colsplit(tax2$row, " ", c("otu", "seq"))
-row.names(tax2) = tax2$row
-tax2 = tax2[,-c(8:9)]
-tax2 = tax_table(as.matrix(tax2))
-
-#meta data
 library(readxl)
-met <- as.data.frame(read_excel("data/met.xlsx", sheet = 1))
-row.names(met) = met$code
-met$pop.year = paste(met$Population, ".", gsub("20", "", met$Year))
-met$pop.year = gsub(" ", "", met$pop.year)
-
-#phyloseq object
-
-d = merge_phyloseq(tax2, otu_tab, sample_data(met))
-d
-d = subset_taxa(d, Kingdom == "d:Bacteria")
-d
-d = subset_taxa(d, Phylum != "p:Cyanobacteria/Chloroplast")
-d       
-decon.r = subset_samples(d, Source == "soil")
-decon.r
-decon.r = subset_samples(decon.r, Species == "P. cooperi")
-decon.r
-decon.r = prune_taxa(taxa_sums(decon.r) >= 1, decon.r)
-decon.r
-
-####decontaminate phyloseq object based on frequency and prevelence
 library(devtools)
 #devtools::install_github("benjjneb/decontam")
 library(decontam)
+library(vegan)
 
-df <- as.data.frame(sample_data(decon.r)) # Put sample_data into a ggplot-friendly d
-df$LibrarySize <- sample_sums(decon.r)
-df <- df[order(df$LibrarySize),]
-df$Index <- seq(nrow(df))
-library(ggplot2)
-p = ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample_or_Control)) + geom_point()
-ggsave(p, width = 8, height = 6, units = "in", file="results/lib_size.jpg")
+###ROOT OMF ANALYSIS......................................
+#meta data sheet
+met <- as.data.frame(read_excel("data/met.xlsx", sheet = 1))
 
-###frequency based
-contamdf.freq <- isContaminant(decon.r, method="frequency", conc="DNA_conc")
-table(contamdf.freq$contaminant)
-which(contamdf.freq$contaminant == "TRUE")
-decon.r <- prune_taxa(!contamdf.freq$contaminant, decon.r)
-decon.r
+source("scripts/make_phyloseq_object.R")
 
-d_r = subset_samples(decon.r, Sample_or_Control == "Sample")
+#phyloseq object
+
+decon = subset_samples(d, Source == "root")
+decon
+decon = subset_samples(decon, Species == "P. praeclara")
+decon
+decon = prune_taxa(taxa_sums(decon) >= 1, decon)
+decon
+
+##"Remove taxa not seen more than 2 times in at least 5% of the samples. 
+#This protects against an OTU with small mean & trivially large C.V.
+#decon = filter_taxa(decon, function(x) sum(x > 0) > (0.05*length(x)), TRUE)
+#decon
+
+####decontaminate phyloseq object based on frequency and prevelence
+
+source("scripts/decontaminate_phyloseq.R")
+
+d_r = subset_samples(decon.d, Sample_or_Control == "Sample")
 d_r
 d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
 d_r
@@ -101,20 +46,16 @@ temp = merge(met, temp, by = "row.names")
 p =  ggplot(temp, aes(Population, Chao1))+ geom_point() + theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-a = summary(aov(Shannon ~ Population + Year + Month + Stage + Pop_size + Demo, data = temp))
-a
-p.ad = p.adjust(a[[1]]$`Pr(>F)`)
-p.ad
-a = summary(aov(Simpson ~ Population + Year + Month + Stage + Pop_size + Demo, data = temp))
+a = summary(aov(Simpson ~ Population + Year + Stage + Pop_size, data = temp))
 a
 p.ad = p.adjust(a[[1]]$`Pr(>F)`)
 p.ad
 
-plot_richness(d_r, x= "Population", measures=c("Shannon", "Simpson") )
+plot_richness(d_r, x= "Population", measures=c("Simpson") )
 
 # Beta diversity with bray ------------------------------------------------
 library(vegan)
-otu2 = t(data.frame(otu_table(d_r)))
+otu2 = data.frame(otu_table(d_r))
 otu2 = decostand(otu2, method = "hellinger")
 rowSums(otu2)
 otu2 = otu2[rowSums(otu2) > 0,]
@@ -131,6 +72,9 @@ dist_w = vegdist(rel_otu_code, method = "bray")
 
 a = adonis2(dist_w ~ sample_data(d3)$Population + sample_data(d3)$Stage + as.factor(sample_data(d3)$Year), permutations = 999)
 a
+
+###ajust P-values
+p.adjust(a$`Pr(>F)`, method = "bonferroni")
 
 ###Do the hierarchial clustering by compressing the
 #phyloseq object at level which is significantly different
@@ -158,58 +102,16 @@ p
 colfunc <- colorRampPalette(c("grey", "black"))
 library(gplots)
 g1 = heatmap.2(as.matrix(otu3), 
-          Rowv = as.dendrogram(h), margins = c(10, 3), col = colfunc(50), 
+          Rowv = as.dendrogram(h), margins = c(5, 5), col = colfunc(50), 
           xlab = "Weighted Bray Curtis dissimilarity distances",
           trace = "none",
           cellnote = otu3, notecex=1.0,
           notecol="white")
 
-# Indicator species analyses ----------------------------------------------
-
-library(indicspecies)
-ind.df = data.frame(otu2)##the taxa should be columns and this otu table is hellinger tranfromed
-
-#Identification of species most responsible for differences among groups of samples
-#SIMPER(similaritypercentage), Based on abundance, does not weigh occurrence frequency as indicator species analysis does.
-
-sim = simper(ind.df, sample_data(d3)$Pop_size)
-sim.sum = summary(sim)
-sim.df.popsize = data.frame(sim.sum$S_L)
-
-sim = simper(ind.df, sample_data(d3)$Demo)
-sim.sum = summary(sim)
-sim.df.demo = data.frame(sim.sum$F_NF)
-
-sim = simper(ind.df, sample_data(d3)$int2)
-sim.sum = summary(sim)
-sim.df.sf.snf = data.frame(sim.sum$S.F_S.NF)
-sim.df.lf.snf = data.frame(sim.sum$S.NF_L.F)
-sim.df.lf.sf = data.frame(sim.sum$S.F_L.F)
-
-l.mann.otus = unique(c(row.names(sim.df.popsize)[1:200], row.names(sim.df.demo)[1:200]))
-
-library(dplyr)
-
-mann.df = ind.df[,names(ind.df) %in% l.mann.otus]
-
-mann.df2 = merge(mann.df, met3, by = "row.names")
-mann.df2$Pop_size = as.factor(mann.df2$Pop_size)
-mann.df2$Demo = as.factor(mann.df2$Demo)
-
-##Do kruskal wallis test with the first 10 OTUs from simper analyses
-
-sim.kw = c()
-for(i in 2:12){
-  column = names(mann.df2[i])
-  k = kruskal.test(mann.df2[,i]~Pop_size, data = mann.df2)$"p.value"
-  k.demo = kruskal.test(mann.df2[,i]~Demo, data = mann.df2)$"p.value"
-  results = data.frame(otu = paste(column), pvalue.popsize = paste(k), pvalue.demo = paste(k.demo))
-  sim.kw = rbind(sim.kw, results)
-} 
-
 # Realtive abundance plots at OTU level ------------------------------------------------
 
-d_f = merge_samples(d_r, "pop.year")
+sample_data(d_r)$sp.sta = paste(sample_data(d_r)$Species, ".", sample_data(d_r)$Stage)
+d_f = merge_samples(d_r, "sp.sta")
 gen_f = data.frame(otu_table(d_f))
 gen_f = t(gen_f)
 gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
@@ -247,7 +149,47 @@ p = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
 p$data$variable = factor(p$data$variable, ordered = TRUE, levels = rev(who))
 p
 
-ggsave(p, width = 8, height = 6, units = "in", file="results/rel_abun_otu.jpg")
+ggsave(p, width = 10, height = 10, units = "in", file="results/rel_abun_otu.jpg")
+
+# Relative abundance at phylum level --------------------------------------
+
+d_f = tax_glom(d_r, taxrank = "Phylum")
+d_f = merge_samples(d_f, "pop.year")
+gen_f = data.frame(otu_table(d_f))
+gen_f = t(gen_f)
+gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
+gen_f$rank = as.character(gen_f$Phylum)
+#gen_f$rank = paste(as.character(gen_f$Row.names), "_", gen_f$Family)
+list = as.character(gen_f$rank)
+list = paste(list, "_", rep(1:length(list)), sep = "")
+gen_f = gen_f[,-1]
+drops <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "rank")
+gen_f = gen_f[ , !(names(gen_f) %in% drops)]
+gen_f = data.frame(t(gen_f))
+gen_f = gen_f/rowSums(gen_f)
+names(gen_f) = list
+#met$Sample = ordered(met$Sample, levels = c("A", "B", "C", "D", "E", "F", "G"))
+who = names(sort(colMeans(gen_f), decreasing = TRUE))
+f = gen_f[,names(gen_f) %in% who]
+f$Other = 1-rowSums(f)
+who = c(who, "Other")
+dd = f
+dd$sl = row.names(dd)
+m = melt(dd, id.vars = c("sl"), measure.vars = who)
+library(RColorBrewer)
+state_col2 = scale_fill_manual(name = "State3", values=c("blue2", "black","yellow1",
+                                                         "dodgerblue1", "orangered4", "yellow4", "deeppink4", 
+                                                         "slategray4", "seagreen4" , "aquamarine",
+                                                         "tomato2", brewer.pal(n = 8, name = "Accent")))
+
+library(scales)
+
+p.phy = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
+  theme_bw(base_size = 20) + state_col2 + xlab("Sample") + ylab("Relative Abundance") + theme(axis.text.x = element_text(angle = 45, hjust = 0.9, size = 10, color = "black")) +
+  theme(legend.text = element_text(face = "italic", size = 10)) + guides(fill = guide_legend(ncol = 1, reverse=T, keywidth = 0.8, keyheight = 0.8))+ scale_y_continuous(labels = percent_format())
+p.phy$data$variable = factor(p.phy$data$variable, ordered = TRUE, levels = rev(who))
+
+p.phy
 
 # Realtive abundance plots at Family level ------------------------------------------------
 
@@ -294,5 +236,5 @@ p$data$variable = factor(p$data$variable, ordered = TRUE, levels = rev(who))
 
 p
 
-ggsave(p, width = 8, height = 6, units = "in", file="results/rel_abun_fam.jpg")
+ggsave(p, width = 10, height = 10, units = "in", file="results/rel_abun_fam.jpg")
 

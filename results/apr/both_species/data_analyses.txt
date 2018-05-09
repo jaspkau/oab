@@ -1,0 +1,95 @@
+> source("scripts/make_phyloseq_object.R")
+> 
+> decon.r = subset_samples(d, Source == "root")
+> decon.r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 120964 taxa and 194 samples ]
+sample_data() Sample Data:       [ 194 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 120964 taxa by 7 taxonomic ranks ]
+> decon.r = prune_taxa(taxa_sums(decon.r) >= 1, decon.r)
+> decon.r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1683 taxa and 194 samples ]
+sample_data() Sample Data:       [ 194 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 1683 taxa by 7 taxonomic ranks ]
+> ####decontaminate phyloseq object based on frequency and prevelence
+> library(devtools)
+> #devtools::install_github("benjjneb/decontam")
+> library(decontam)
+> 
+> df <- as.data.frame(sample_data(decon.r)) # Put sample_data into a ggplot-friendly d
+> df$LibrarySize <- sample_sums(decon.r)
+> df <- df[order(df$LibrarySize),]
+> df$Index <- seq(nrow(df))
+> library(ggplot2)
+> p = ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample_or_Control)) + geom_point()
+> ggsave(p, width = 8, height = 6, units = "in", file="results/lib_size.jpg")
+> 
+> ###frequency based
+> contamdf.freq <- isContaminant(decon.r, method="frequency", conc="DNA_conc")
+> table(contamdf.freq$contaminant)
+
+FALSE 
+ 1683 
+> which(contamdf.freq$contaminant == "TRUE")
+integer(0)
+> decon.r <- prune_taxa(!contamdf.freq$contaminant, decon.r)
+> decon.r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1683 taxa and 194 samples ]
+sample_data() Sample Data:       [ 194 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 1683 taxa by 7 taxonomic ranks ]
+> d_r = subset_samples(decon.r, Sample_or_Control == "Sample")
+> d_r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1683 taxa and 190 samples ]
+sample_data() Sample Data:       [ 190 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 1683 taxa by 7 taxonomic ranks ]
+> d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
+> d_r
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 1421 taxa and 190 samples ]
+sample_data() Sample Data:       [ 190 samples by 16 sample variables ]
+tax_table()   Taxonomy Table:    [ 1421 taxa by 7 taxonomic ranks ]
+
+################################################################################Alpha diversity
+
+> a = summary(aov(Simpson ~ Species + Population + Year + Stage + Pop_size, data = temp))
+> a
+             Df Sum Sq Mean Sq F value Pr(>F)  
+Species       1  0.110 0.10956   4.527 0.0348 *
+Population   12  0.427 0.03555   1.469 0.1400  
+Year          1  0.101 0.10124   4.183 0.0424 *
+Stage         2  0.030 0.01495   0.618 0.5403  
+Residuals   173  4.187 0.02420                 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> p.ad = p.adjust(a[[1]]$`Pr(>F)`)
+> p.ad
+[1] 0.1391429 0.2799073 0.1391429 0.5403252        NA
+
+> ##PERMANOVA#######################################################################
+> 
+> ###Weighted distance
+> 
+> a = adonis2(dist_w ~ sample_data(d3)$Species + sample_data(d3)$Species*sample_data(d3)$Population + sample_data(d3)$Stage + as.factor(sample_data(d3)$Year), permutations = 999)
+> a
+Permutation test for adonis under reduced model
+Terms added sequentially (first to last)
+Permutation: free
+Number of permutations: 999
+
+adonis2(formula = dist_w ~ sample_data(d3)$Species + sample_data(d3)$Species * sample_data(d3)$Population + sample_data(d3)$Stage + as.factor(sample_data(d3)$Year), permutations = 999)
+                                 Df SumOfSqs      R2      F Pr(>F)    
+sample_data(d3)$Species           1    2.475 0.03021 6.1868  0.001 ***
+sample_data(d3)$Population       12    9.177 0.11201 1.9113  0.001 ***
+sample_data(d3)$Stage             2    1.583 0.01932 1.9781  0.001 ***
+as.factor(sample_data(d3)$Year)   3    2.278 0.02780 1.8975  0.001 ***
+Residual                        166   66.417 0.81066                  
+Total                           184   81.929 1.00000                  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> 
+> ###ajust P-values
+> p.adjust(a$`Pr(>F)`, method = "bonferroni")
+[1] 0.004 0.004 0.004 0.004    NA    NA

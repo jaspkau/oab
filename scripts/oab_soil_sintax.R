@@ -3,15 +3,20 @@ setwd("C:/Users/jaspr/Google Drive/Metagenomics/oab/")
 setwd("/Users/administrator/Documents/jaspreet/oab/oab/")
 
 library(phyloseq)
+library(reshape2)
+library(readxl)
+library(devtools)
+#devtools::install_github("benjjneb/decontam")
+library(decontam)
+library(vegan)
 
-###ROOT OMF ANALYSIS......................................
 # Make phyloseq object ----------------------------------------------------
 #meta data sheet
 met <- as.data.frame(read_excel("data/met.xlsx", sheet = 1))
 
 source("scripts/make_phyloseq_object.R")
 
-decon = subset_samples(d, Source == "root")
+decon = subset_samples(d, Source == "soil")
 decon
 decon = subset_samples(decon, Species == "P. praeclara")
 decon
@@ -20,26 +25,14 @@ decon
 
 ####decontaminate phyloseq object based on frequency and prevelence
 
-source("scripts/decontaminate_phyloseq.R")
-d_r = subset_samples(decon.d, Sample_or_Control == "Sample")
-d_r
-d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
-d_r
+sample_data(decon)$is.neg <- sample_data(decon)$Sample_or_Control == "Control"
+contamdf.prev <- isContaminant(decon, method="prevalence", neg="is.neg", conc="DNA_conc", threshold=0.5)
+table(contamdf.prev$contaminant)
+which(contamdf.prev$contaminant)
+decon.d <- prune_taxa(!contamdf.prev$contaminant, decon)
+decon.d
 
-r.otus = taxa_names(d_r)
-otu_s = data.frame(otu_table(d))
-otu_s2 = otu_s[r.otus,]
-otu_s2 = otu_s2[,colSums(otu_s2) > 0]
-#otu_s3 = otu_s2[, colSums(otu_s2 > 0)]
-otu_s4 = otu_table(as.matrix(otu_s2), taxa_are_rows = T)
-
-d_s = merge_phyloseq(tax2, otu_s4, sample_data(met))
-d_s
-d_s = subset_samples(d_s, Source == "soil")
-d_s
-d_s = subset_samples(d_s, Species == "P. praeclara")
-d_s
-d_s = subset_samples(d_s, Sample_or_Control == "Sample")
+d_s = subset_samples(decon.d, Sample_or_Control == "Sample")
 d_s
 d_s = prune_taxa(taxa_sums(d_s) >= 1, d_s)
 d_s
