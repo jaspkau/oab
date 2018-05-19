@@ -3,6 +3,12 @@ setwd("C:/Users/jaspr/Google Drive/Metagenomics/oab/")
 setwd("/Users/administrator/Documents/jaspreet/oab/oab/")
 
 library(phyloseq)
+library(reshape2)
+library(readxl)
+library(devtools)
+#devtools::install_github("benjjneb/decontam")
+library(decontam)
+library(vegan)
 
 ###ROOT OMF ANALYSIS......................................
 # Make phyloseq object ----------------------------------------------------
@@ -13,7 +19,7 @@ source("scripts/make_phyloseq_object.R")
 
 decon = subset_samples(d, Source == "root")
 decon
-decon = subset_samples(decon, Species == "P. praeclara")
+decon = subset_samples(decon, Species == "P. cooperi")
 decon
 decon = prune_taxa(taxa_sums(decon) >= 1, decon)
 decon
@@ -27,6 +33,36 @@ d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
 d_r
 
 r.otus = taxa_names(d_r)
+
+###make soil phyloseq
+
+decon = subset_samples(d, Source == "soil")
+decon
+decon = subset_samples(decon, Species == "P. cooperi")
+decon
+decon = prune_taxa(taxa_sums(decon) >= 1, decon)
+decon
+
+####decontaminate phyloseq object based on frequency and prevelence
+
+sample_data(decon)$is.neg <- sample_data(decon)$Sample_or_Control == "Control"
+#contamdf.prev <- isContaminant(decon, method="frequency", neg="is.neg", conc="DNA_conc", threshold=0.5)
+contamdf.prev <- isContaminant(decon, method="prevalence", neg="is.neg", threshold=0.5)
+table(contamdf.prev$contaminant)
+which(contamdf.prev$contaminant)
+decon.d <- prune_taxa(!contamdf.prev$contaminant, decon)
+decon.d
+
+d_s = subset_samples(decon.d, Sample_or_Control == "Sample")
+d_s
+
+d_oab = prune_taxa(r.otus, d_s) ##extract root otus from soil phyloseq
+d_oab = prune_taxa(taxa_sums(d_oab) >= 1, d_oab)
+d_oab
+
+# Alpha diversity ---------------------------------------------------------
+
+temp = estimate_richness(d_oab)
 otu_s = data.frame(otu_table(d))
 otu_s2 = otu_s[r.otus,]
 otu_s2 = otu_s2[,colSums(otu_s2) > 0]
@@ -51,6 +87,7 @@ temp = merge(met, temp, by = "row.names")
 p =  ggplot(temp, aes(Population, Chao1))+ geom_point() + theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+a = summary(aov(Simpson ~ Pop_size + Population + Year, data = temp))
 a = summary(aov(Shannon ~ Population + Year, data = temp))
 a
 p.ad = p.adjust(a[[1]]$`Pr(>F)`)
@@ -60,6 +97,11 @@ a
 p.ad = p.adjust(a[[1]]$`Pr(>F)`)
 p.ad
 
+plot_richness(d_s, x= "Population", measures=c("Simpson") )
+
+# Beta diversity with bray ------------------------------------------------
+library(vegan)
+otu2 = data.frame(otu_table(d_oab))
 plot_richness(d_s, x= "Population", measures=c("Shannon", "Simpson") )
 
 # Beta diversity with bray ------------------------------------------------
@@ -79,7 +121,7 @@ dist_w = vegdist(rel_otu_code, method = "bray")
 
 ###Weighted distance
 
-a = adonis2(dist_w ~ sample_data(d3)$Population + as.factor(sample_data(d3)$Year), permutations = 999)
+a = adonis2(dist_w ~ sample_data(d3)$Pop_size + sample_data(d3)$Population + as.factor(sample_data(d3)$Year), permutations = 999)
 a
 
 ###ajust P-values
@@ -88,7 +130,8 @@ p.adjust(a$`Pr(>F)`, method = "bonferroni")
 ###Do the hierarchial clustering by compressing the
 #phyloseq object at level which is significantly different
 
-d2 = merge_samples(d_s, "pop.year")
+#sample_data(d_oab)$pop.l = paste(sample_data(d_oab)$Population, ".", sample_data(d_oab)$Samp_L)
+d2 = merge_samples(d_oab, "pop.year")
 otu3 = data.frame(otu_table(d2))
 otu3 = decostand(otu3, method = "hellinger")
 rowSums(otu3)
@@ -111,7 +154,7 @@ p
 colfunc <- colorRampPalette(c("grey", "black"))
 library(gplots)
 g1 = heatmap.2(as.matrix(otu3), 
-               Rowv = as.dendrogram(h), margins = c(10, 3), col = colfunc(50), 
+               Rowv = as.dendrogram(h), margins = c(10, 5), col = colfunc(50), 
                xlab = "Weighted Bray Curtis dissimilarity distances",
                trace = "none",
                cellnote = otu3, notecex=1.0,
@@ -119,7 +162,7 @@ g1 = heatmap.2(as.matrix(otu3),
 
 # Realtive abundance plots at OTU level ------------------------------------------------
 
-d_f = merge_samples(d_s, "pop.year")
+d_f = merge_samples(d_oab, "pop.year")
 gen_f = data.frame(otu_table(d_f))
 gen_f = t(gen_f)
 gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
@@ -160,7 +203,7 @@ ggsave(p, width = 8, height = 6, units = "in", file="results/rel_abun_otu.jpg")
 
 # Realtive abundance plots at Family level ------------------------------------------------
 
-d_f = tax_glom(d_s, taxrank = "Family")
+d_f = tax_glom(d_oab, taxrank = "Family")
 d_f = merge_samples(d_f, "pop.year")
 gen_f = data.frame(otu_table(d_f))
 gen_f = t(gen_f)
@@ -204,4 +247,27 @@ p$data$variable = factor(p$data$variable, ordered = TRUE, levels = rev(who))
 p
 
 ggsave(p, width = 8, height = 6, units = "in", file="results/rel_abun_fam.jpg")
+
+# MRM and varition partioning ---------------------------------------------
+
+library(ecodist)
+d_r.pop.year = merge_samples(d_r, "pop.year")
+otu.r = data.frame(otu_table(d_r.pop.year))
+otu.r = decostand(otu.r, method = "hellinger")
+rowSums(otu.r)
+otu.r = otu.r[rowSums(otu.r) > 0,]
+
+dist_w_r = vegdist(otu.r, method = "bray")
+
+d_oab2 = subset_samples(d_oab, Pop_size == "S" | Pop_size == "L")
+d_oab.pop.year = merge_samples(d_oab2, "pop.year")
+otu.s = data.frame(otu_table(d_oab.pop.year))
+otu.s = decostand(otu.s, method = "hellinger")
+rowSums(otu.s)
+otu.s = otu.s[rowSums(otu.s) > 0,]
+
+dist_w_s = vegdist(otu.s, method = "bray")
+
+MRM(dist_w_r ~ dist_w_s, nperm=1000)
+summary(lm(dist_w_r ~ dist_w_s))
 

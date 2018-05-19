@@ -102,11 +102,11 @@ p
 colfunc <- colorRampPalette(c("grey", "black"))
 library(gplots)
 g1 = heatmap.2(as.matrix(otu3), 
-          Rowv = as.dendrogram(h), margins = c(5, 5), col = colfunc(50), 
-          xlab = "Weighted Bray Curtis dissimilarity distances",
-          trace = "none",
-          cellnote = otu3, notecex=1.0,
-          notecol="white")
+               Rowv = as.dendrogram(h), margins = c(5, 5), col = colfunc(50), 
+               xlab = "Weighted Bray Curtis dissimilarity distances",
+               trace = "none",
+               cellnote = otu3, notecex=1.0,
+               notecol="white")
 
 # Realtive abundance plots at OTU level ------------------------------------------------
 
