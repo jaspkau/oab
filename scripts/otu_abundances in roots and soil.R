@@ -1,6 +1,6 @@
 setwd("C://Users//jaspkaur//Google Drive//Metagenomics//oab/")
 setwd("C:/Users/jaspr/Google Drive/Metagenomics/oab/")
-setwd("/Users/administrator/Documents/jaspreet/oab/oab/")
+setwd("/Users/administrator/Documents/jaspreet/oab/oab")
 
 library(phyloseq)
 library(reshape2)
@@ -10,23 +10,64 @@ library(devtools)
 library(decontam)
 library(vegan)
 
-#meta data sheet
 met <- as.data.frame(read_excel("data/met.xlsx", sheet = 1))
 
 source("scripts/make_phyloseq_object.R")
 
-decon = subset_samples(d, Species == "P. cooperi")
+decon = subset_samples(d, Source == "root")
 decon
-decon = subset_samples(decon, Sample_or_Control == "Sample")
-decon
-decon = prune_taxa(taxa_sums(decon) >= 1, decon)
-decon
-d_r = subset_samples(decon, Source == "root")
+#decon = subset_samples(decon, Population2 != "X")
+#decon
+
+####decontaminate phyloseq object based on frequency
+source("scripts/decontaminate_phyloseq.R")
+
+d_r = subset_samples(decon.d, Sample_or_Control == "Sample")
 d_r
+#d_r = subset_samples(d_r, Species == "P. praeclara")
+#d_r
 d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
 d_r
 
-d.abun = merge_samples(decon, "Source")
+###make pc soil phyloseq
+
+decon = subset_samples(d, Source == "soil")
+decon
+decon = subset_samples(decon, Species == "P. cooperi")
+decon
+decon = prune_taxa(taxa_sums(decon) >= 1, decon)
+decon
+
+####decontaminate phyloseq object based on frequency
+source("scripts/decontaminate_phyloseq.R")
+
+d.pc = subset_samples(decon.d, Sample_or_Control == "Sample")
+d.pc
+d.pc = prune_taxa(taxa_sums(d.pc) >= 1, d.pc)
+d.pc
+
+###make pp soil phyloseq
+
+d.pp = subset_samples(d, Source == "soil")
+d.pp
+d.pp = subset_samples(d.pp, Species == "P. praeclara")
+d.pp
+d.pp = prune_taxa(taxa_sums(d.pp) >= 1, d.pp)
+d.pp
+
+####Combine phyloseq objects
+
+d.fin = merge_phyloseq(d_r, d.pc, d.pp)
+d.fin
+
+###Filter d.fin for most abundant bacterial phyla observed in roots
+
+d.fin2 = subset_taxa(d.fin, Phylum == "p:Proteobacteria"| Phylum == "p:Firmicutes"|
+                       Phylum == "p:Actinobacteria"| Phylum == "p:Bacteroidetes")
+
+d.fin2 = subset_taxa(d.fin, Family == "f:Pseudomonadaceae")
+
+d.abun = merge_samples(d.fin2, "Source")
 mytaxa = taxa_names(d_r)
 d.abun2 = prune_taxa(mytaxa, d.abun)
 
@@ -44,38 +85,16 @@ p = ggplot(test2, aes(root, soil)) + geom_point() +
             hjust = "inward", check_overlap = TRUE)
 p
 
-# PCoA with bray --------------------------------------------------------------------
+# ANCOM (Analysis of composition of microbiome)-------------------------------------------------------------------
 
-d.pcoa = prune_taxa(mytaxa, decon)
-library(vegan)
-otu2 = data.frame(otu_table(d.pcoa))
-otu2 = decostand(otu2, method = "hellinger")
-rowSums(otu2)
-otu2 = otu2[rowSums(otu2) > 0,]
-otu2 = otu_table(as.matrix(otu2), taxa_are_rows = F)
+ancom.otu = t(data.frame(otu_table(d.an))) ##columns = OTUs and should be counts
+ancom.otu = merge(ancom.otu, sample_data(d.an), by = "row.names")
+row.names(ancom.otu) = ancom.otu$Code
+ancom.otu = ancom.otu[,-1]
+names(ancom.otu)
+##look for the grouping variable you want to use
+ancom.fin = ancom.otu[, grepl("otu", names(ancom.otu))|grepl("Pop_size", names(ancom.otu))]
 
-d3 = merge_phyloseq(tax2, otu2, sample_data(d))
-rel_otu_code = data.frame(otu_table(d3))
-
-dist_w = vegdist(rel_otu_code, method = "bray")
-
-state_col_ord = scale_color_manual(values=c("red", "black"))
-
-####Weighted
-
-pc = capscale(dist_w ~ 1, comm = rel_otu_code) ###~ means function of nothing
-pc$CA$eig
-s = summary(pc)
-cap = data.frame(pc$CA$u)
-plot(cap[,1], cap[,2])
-cap = merge(sample_data(d), cap, by = "row.names")
-#cap$Population = cap$Row.names
-label = cap$int
-
-p = ggplot(cap, aes(x= MDS1, y= MDS2))+theme_bw(base_size = 15) +
-  geom_point(aes(color = Source), size=2) + state_col_ord +
-  labs(x = paste("Axis 1 (", round(s$cont$importance[2,1]*100, digits =2), "%)", sep = ''),
-       y = paste("Axis 2 (", round(s$cont$importance[2,2]*100, digits =2), "%)", sep = ''))
-p
-
-                  
+anc = ANCOM(ancom.fin, multcorr = 1, sig = 0.05)
+anc$detected
+plot_ancom(anc)

@@ -38,8 +38,8 @@ p.otus
 
 # Realtive abundance plots at Family level ------------------------------------------------
 
-d_f = tax_glom(d.fin2, taxrank = "Family")
-d_f = merge_samples(d_f, "pop.year")
+d_f = tax_glom(d.s, taxrank = "Family")
+d_f = merge_samples(d_f, "Species")
 gen_f = data.frame(otu_table(d_f))
 gen_f = t(gen_f)
 gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
@@ -79,14 +79,14 @@ p.fam = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
   theme_bw(base_size = 20) + state_col2 + xlab("Sample") + ylab("Relative Abundance") + theme(axis.text.x = element_text(angle = 45, hjust = 0.9, size = 10, color = "black")) +
   theme(legend.text = element_text(face = "italic", size = 10)) + guides(fill = guide_legend(ncol = 1, reverse=T, keywidth = 0.8, keyheight = 0.8))+ scale_y_continuous(labels = percent_format())
 p.fam$data$variable = factor(p.fam$data$variable, ordered = TRUE, levels = rev(who))
-p
+p.fam
 
 #ggsave(file="jc.treatment.nms.jpg")
 
-# Realtive abundance plots at Family level ------------------------------------------------
+# Realtive abundance plots at Phylum level ------------------------------------------------
 
-d_f = tax_glom(d.fin2, taxrank = "Phylum")
-d_f = merge_samples(d_f, "pop.year")
+d_f = tax_glom(d.s, taxrank = "Phylum")
+d_f = merge_samples(d_f, "Species")
 gen_f = data.frame(otu_table(d_f))
 gen_f = t(gen_f)
 gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
@@ -120,6 +120,4 @@ p.phy = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
   theme_bw(base_size = 20) + state_col2 + xlab("Sample") + ylab("Relative Abundance") + theme(axis.text.x = element_text(angle = 45, hjust = 0.9, size = 10, color = "black")) +
   theme(legend.text = element_text(face = "italic", size = 10)) + guides(fill = guide_legend(ncol = 1, reverse=T, keywidth = 0.8, keyheight = 0.8))+ scale_y_continuous(labels = percent_format())
 p.phy$data$variable = factor(p.phy$data$variable, ordered = TRUE, levels = rev(who))
-
-
 

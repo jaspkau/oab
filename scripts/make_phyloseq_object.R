@@ -1,7 +1,7 @@
 otu <- read.delim(file = "data/otu_table_no_singletons_sintax.txt", 
                   sep = "\t", header = T)
 otu = otu[,-ncol(otu)]
-row.names(otu) = paste(gsub("denovo", "o", otu[,1]))
+row.names(otu) = paste(gsub("denovo", "otu", otu[,1]))
 otu = otu[,-1]
 #Rarefy(otu, depth = min(rowSums(otu)))
 otu = otu[,colSums(otu) > 0]
@@ -33,7 +33,7 @@ tax2 = tax2[,-c(2,4,6,8,10,12,14)]
 
 tax2$row = row.names(tax2)
 tax2[,8:9] = colsplit(tax2$row, " ", c("otu", "seq"))
-row.names(tax2) = paste(gsub("denovo", "o", tax2$row))
+row.names(tax2) = paste(gsub("denovo", "otu", tax2$row))
 tax2 = tax2[,-c(8:9)]
 tax2 = tax_table(as.matrix(tax2))
 
