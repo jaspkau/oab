@@ -32,94 +32,48 @@ d_r
 d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
 d_r
 
-d_r = subset_taxa(d_r, Phylum == "p:Proteobacteria"| Phylum == "p:Firmicutes"|
-                      Phylum == "p:Actinobacteria")
-
-####Shared and Unique OTUs
-
-d.pc2 = subset_samples(d_r, Species == "P. cooperi")
-d.pc2
-d.pc2 = prune_taxa(taxa_sums(d.pc2) >= 1, d.pc2)
-d.pc2
-comb = tax_glom(d.pc2, "Kingdom")
-comb
-taxa_sums(comb)
-
-d.pp2 = subset_samples(d_r, Species == "P. praeclara")
-d.pp2
-d.pp2 = prune_taxa(taxa_sums(d.pp2) >= 1, d.pp2)
-d.pp2
-
-comb = tax_glom(d.pp2, "Kingdom")
-comb
-taxa_sums(comb)
-
-d.pp.r_pc.r = prune_taxa(taxa_names(d.pp2) %in% taxa_names(d.pc2), d.pp2)
-d.pp.r_pc.r
-
 comb = tax_glom(d_r, "Kingdom")
 comb
 taxa_sums(comb)
+
+####MOST ABUDANT PHYLA IN ROOTS
 
 a = subset_taxa(d_r, Phylum == "p:Proteobacteria")
 a
 b = tax_glom(a, "Phylum")
 b
-taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d_r, Phylum == "p:Firmicutes")
 a
 b = tax_glom(a, "Phylum")
 b
-taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d_r, Phylum == "p:Actinobacteria")
 a
 b = tax_glom(a, "Phylum")
 b
-taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
-a = subset_taxa(d_r, Phylum == "p:Bacteroidetes")
-a
-b = tax_glom(a, "Phylum")
-b
-taxa_sums(b)
+d_r = subset_taxa(d_r, Phylum == "p:Proteobacteria"| Phylum == "p:Firmicutes"|
+                      Phylum == "p:Actinobacteria")
 
-a = subset_taxa(d_r, Family == "f:Pseudomonadaceae")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
+####OTU shared between species and unique ones
 
-a = subset_taxa(d_r, Family == "f:Burkholderiaceae")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
-
-a = subset_taxa(d_r, Family == "f:Bacillales_incertae_sedis")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
-
-a = subset_taxa(d_r, Family == "f:Halomonadaceae")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
-
-a = subset_taxa(d_r, Family == "f:Xanthomonadaceae")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
-
-a = subset_taxa(d_r, Family == "f:Micrococcaceae")
-a
-b = tax_glom(a, "Family")
-b
-taxa_sums(b)
+d.pc = subset_samples(d_r, Species == "P. cooperi")
+d.pc
+d.pc = prune_taxa(taxa_sums(d.pc) >= 1, d.pc)
+d.pc
+d.pp = subset_samples(d_r, Species == "P. praeclara")
+d.pp
+d.pp = prune_taxa(taxa_sums(d.pp) >= 1, d.pp)
+d.pp
+d.shared = prune_taxa(taxa_names(d.pp) %in% taxa_names(d.pc), d.pp)
+d.shared
 
 ##############phenological stages
 sample_data(d_r)$int = paste(sample_data(d_r)$Species,".",sample_data(d_r)$Stage)
@@ -156,6 +110,12 @@ b = tax_glom(b, "Family")
 b
 sample_sums(b)
 
+b = subset_taxa(a, Family == "f:Bacillales_incertae_sedis")
+b
+b = tax_glom(b, "Family")
+b
+sample_sums(b)
+
 
 ###############Soil--------------------------------------------------------
 
@@ -164,8 +124,6 @@ sample_sums(b)
 decon = subset_samples(d, Source == "soil")
 decon
 decon = subset_samples(decon, Species == "P. cooperi")
-decon
-decon = subset_samples(decon, Pop_size != "Con")
 decon
 decon = prune_taxa(taxa_sums(decon) >= 1, decon)
 decon
@@ -177,9 +135,9 @@ d.pc = subset_samples(decon.d, Sample_or_Control == "Sample")
 d.pc
 d.pc = prune_taxa(taxa_sums(d.pc) >= 1, d.pc)
 d.pc
-comb = tax_glom(d.pc, "Kingdom")
-comb
-taxa_sums(comb)
+comb.pc = tax_glom(d.pc, "Kingdom")
+comb.pc
+taxa_sums(comb.pc)
 
 ###make pp soil phyloseq
 
@@ -190,9 +148,9 @@ d.pp
 d.pp = prune_taxa(taxa_sums(d.pp) >= 1, d.pp)
 d.pp
 
-comb = tax_glom(d.pp, "Kingdom")
-comb
-taxa_sums(comb)
+comb.pp = tax_glom(d.pp, "Kingdom")
+comb.pp
+taxa_sums(comb.pp)
 
 ####Combine phyloseq objects
 
@@ -203,52 +161,53 @@ comb = tax_glom(d.s, "Kingdom")
 comb
 taxa_sums(comb)
 
-d.pc3 = subset_samples(d.s, Species == "P. cooperi")
-d.pc3
-d.pc3 = prune_taxa(taxa_sums(d.pc3) >= 1, d.pc3)
-d.pc3
-d.pp3 = subset_samples(d.s, Species == "P. praeclara")
-d.pp3
-d.pp3 = prune_taxa(taxa_sums(d.pp3) >= 1, d.pp3)
-d.pp3
-d.pc.s_pp.s = prune_taxa(taxa_names(d.pp3) %in% taxa_names(d.pc3), d.pp3)
-d.pc.s_pp.s
-
 a = subset_taxa(d.s, Phylum == "p:Proteobacteria")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d.s, Phylum == "p:Acidobacteria")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d.s, Phylum == "p:Bacteroidetes")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d.s, Phylum == "p:Verrucomicrobia")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d.s, Phylum == "p:Planctomycetes")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 a = subset_taxa(d.s, Phylum == "p:Actinobacteria")
 a
 b = tax_glom(a, "Phylum")
 b
 taxa_sums(b)
+x = taxa_sums(b)/taxa_sums(comb)
+x
 
 #####after selecting for bacterial phyla -------------------------
 
@@ -259,10 +218,12 @@ d.pc3 = subset_samples(d.fin, Species == "P. cooperi")
 d.pc3
 d.pc3 = prune_taxa(taxa_sums(d.pc3) >= 1, d.pc3)
 d.pc3
+
 d.pp3 = subset_samples(d.fin, Species == "P. praeclara")
 d.pp3
 d.pp3 = prune_taxa(taxa_sums(d.pp3) >= 1, d.pp3)
 d.pp3
+
 d.pc.s_pp.s = prune_taxa(taxa_names(d.pp3) %in% taxa_names(d.pc3), d.pp3)
 d.pc.s_pp.s
 
@@ -275,13 +236,14 @@ d.r_pcs = prune_taxa(taxa_names(d.pc3) %in% taxa_names(d_r), d.pc3)
 d.r_pcs
 comb = tax_glom(d.r_pcs, "Kingdom")
 comb
-taxa_sums(comb)
+taxa_sums(comb)/taxa_sums(comb.pc)
 
 d.r_pps = prune_taxa(taxa_names(d.pp3) %in% taxa_names(d_r), d.pp3)
 d.r_pps
 comb = tax_glom(d.r_pps, "Kingdom")
 comb
 taxa_sums(comb)
+taxa_sums(comb)/taxa_sums(comb.pp)
 
 ####################################Pop_size counts
 ####Combine phyloseq objects
@@ -291,6 +253,8 @@ d.fin
 sample_data(d.fin)$int = paste(sample_data(d.fin)$Species,".",sample_data(d.fin)$Source,
                                ".", sample_data(d.fin)$Pop_size)
 sample_data(d.fin)$int = gsub(" ", "", sample_data(d.fin)$int)
+
+sample_data(d.fin)$int = paste(sample_data(d.fin)$Species,".",sample_data(d.fin)$Source)
 
 a = merge_samples(d.fin, "int")
 a

@@ -16,16 +16,12 @@ source("scripts/make_phyloseq_object.R")
 
 decon = subset_samples(d, Source == "root")
 decon
-#decon = subset_samples(decon, Population2 != "X")
-#decon
 
 ####decontaminate phyloseq object based on frequency
 source("scripts/decontaminate_phyloseq.R")
 
 d_r = subset_samples(decon.d, Sample_or_Control == "Sample")
 d_r
-#d_r = subset_samples(d_r, Species == "P. praeclara")
-#d_r
 d_r = prune_taxa(taxa_sums(d_r) >= 1, d_r)
 d_r
 

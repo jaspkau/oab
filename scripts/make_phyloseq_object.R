@@ -46,12 +46,6 @@ met$Stage = as.factor(met$Stage)
 met$Samp_L = as.factor(met$Samp_L)
 met$Pop_size = as.factor(met$Pop_size)
 met$Sample_or_Control = as.factor(met$Sample_or_Control)
-met$pop.year = paste(met$Population, ".", gsub("20", "", met$Year))
-met$pop.year = gsub(" ", "", met$pop.year)
-met$pop.sta = paste(met$Population, ".", met$Stage)
-met$pop.sta = gsub(" ", "", met$pop.sta)
-met$int = paste(met$Population, ".", met$Stage, ".", gsub("20", "", met$Year))
-met$int = gsub(" ", "", met$int)
 
 #phyloseq object
 

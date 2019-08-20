@@ -7,31 +7,14 @@ setwd("/Users/administrator/Documents/jaspreet/oab/oab")
 library("Biostrings")
 library("ggplot2")
 #devtools::install_github("GuangchuangYu/treeio")
-#devtools::install_github("GuangchuangYu/ggtree")
+#23
+
 library(treeio)
 library(ape)
 library(ggtree)
 
 #https://bioconductor.org/packages/devel/bioc/vignettes/ggtree/inst/doc/ggtree.html
 #https://guangchuangyu.github.io/presentation/2016-ggtree-chinar/
-
-x = read.mrbayes("results/raxml_bacillales//result.nexusi.con.tre")
-#x = read.raxml("results/phylo/tul_raxml/RAxML_bipartitionsBranchLabels.bootFinal")
-
-###for mrbayes
-tree = ggtree(x, color="black", size=1, linetype="dotted") + geom_tiplab(size=3, color="black") +
-  geom_nodelab(aes(x=branch, label=prob, vjust=-.5, size=3))
-
-tree$data$prob[is.na(tree$data$prob)] = ""
-
-tree = ggtree(x, color="black", size=1, linetype="dotted") + geom_tiplab(size=3, color="black") +
-  geom_nodelab(aes(x=branch, label = round(as.numeric(prob), 2), vjust=-.5, size=1))
-
-###for raxml 
-
-x = read.raxml("results/raxml_burkh/RAxML_bipartitionsBranchLabels.bootFinal")
-tree = ggtree(x, color="black", size=1, linetype="dotted") + geom_tiplab(size=3, color="black") +
-  geom_nodelab(aes(x=branch, label=bootstrap, vjust=-.5, size=3))
 
 ###import associated matrix
 
@@ -112,6 +95,10 @@ row.names(otu) = gsub("otu", "denovo", row.names(otu))
 otu2 = as.data.frame(t(otu))
 otu2 = as.data.frame(t(decostand(otu2, method = "hellinger")))
 
+###for raxml 
+
+x = read.raxml("results/raxml_bacillales/RAxML_bipartitionsBranchLabels.bootFinal")
+
 tree = ggtree(x, color="black", size=0.7) + geom_tiplab(size=3, color="black") +
   geom_nodelab(aes(x=branch, label = bootstrap), vjust=-.5, hjust = 0.5, size=3)
 
@@ -128,6 +115,19 @@ otu2 = as.data.frame(ifelse(otu == 0, 0, 1))
 g = gheatmap(tree, otu2, offset = 0.0, width=0.5, font.size=3, colnames_angle=-45, hjust = 0, 
              low = "red3", high = "limegreen")
 g
+
+###for mrbayes
+x = read.mrbayes("results/raxml_bacillales//result.nexusi.con.tre")
+#x = read.raxml("results/phylo/tul_raxml/RAxML_bipartitionsBranchLabels.bootFinal")
+
+tree = ggtree(x, color="black", size=1, linetype="dotted") + geom_tiplab(size=3, color="black") +
+  geom_nodelab(aes(x=branch, label=prob, vjust=-.5, size=3))
+
+tree$data$prob[is.na(tree$data$prob)] = ""
+
+tree = ggtree(x, color="black", size=1, linetype="dotted") + geom_tiplab(size=3, color="black") +
+  geom_nodelab(aes(x=branch, label = round(as.numeric(prob), 2), vjust=-.5, size=1))
+
 
 ##missleneaous
 

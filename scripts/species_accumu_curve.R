@@ -17,8 +17,6 @@ source("scripts/make_phyloseq_object.R")
 
 decon = subset_samples(d, Source == "root")
 decon
-#decon = subset_samples(decon, Population2 != "X")
-#decon
 
 ####decontaminate phyloseq object based on frequency
 source("scripts/decontaminate_phyloseq.R")
@@ -59,11 +57,6 @@ d.pp
 d.fin = merge_phyloseq(d_r, d.pc, d.pp)
 d.fin
 
-###Filter d.fin for most abundant bacterial phyla observed in roots
-
-d.fin2 = subset_taxa(d.fin, Phylum == "p:Proteobacteria"| Phylum == "p:Firmicutes"|
-                       Phylum == "p:Actinobacteria")
-  
 # Species accumulation curve -------------------------------------------------------
 
 sample_data(d.fin)$int = paste(sample_data(d.fin)$Species,".",sample_data(d.fin)$Source)
@@ -78,16 +71,16 @@ sample_data(d.fin)$int = gsub(" ", "", sample_data(d.fin)$int)
 sample_data(d_r)$int = paste(sample_data(d_r)$Species,".",sample_data(d_r)$Stage)
 sample_data(d_r)$int = gsub(" ", "", sample_data(d_r)$int)
 
-dsac = merge_samples(d_r, "Species")
+dsac = merge_samples(d.fin, "int")
 
 otu_rc = data.frame(otu_table(dsac)) ###rows should be samples
 
 ###
 library(iNEXT)
 otu_rc = data.frame(t(otu_rc)) ####columns should be samples
-m <- c(100, 1000, 2000, 10000, 40000)
+m <- c(100, 1000, 2000, 10000, 40000, 800000)
 out = list(
-  iNEXT(otu_rc, q=1, datatype="abundance", size=m, nboot = 100))
+  iNEXT(otu_rc, q=1, datatype="abundance", size=m, nboot = 1))
 g = ggiNEXT(out, type=1, se = FALSE, facet.var="none")
 
 g1 = g + scale_color_manual(values=c("wheat4", "violetred4", "turquoise3", "tomato2", "springgreen2",

@@ -50,210 +50,54 @@ d_r
 aldiv = estimate_richness(d_r, measures = c("Shannon", "Simpson"))
 temp = merge(met, aldiv, by = "row.names")
 row.names(temp) = temp[,1]
-
-bp <- ggplot(temp, aes(x=Stage, y=Simpson)) + 
-  geom_boxplot(aes(fill= "slategray4")) + 
-  labs(x = paste("Site"), 
-       y = paste("Simpson diversity index (H)")) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-bp
+# The conversion of Simpson diversity to effective numbers is 1/1-D
+temp$ef = 1/(1-temp$Simpson)
+# The conversion of Shannon diversity to effective numbers is exp(H)
+temp$ef.sha = exp(temp$Shannon)
 
 #####Comparisons with catergorical variables
 
 ####Use shannon diversity index coz simpson is inflating diversity in samples with 0 seqs
-shapiro.test(temp$Simpson)
+shapiro.test(temp$ef.sha)
 
 alpha.kw = c()
-for(i in c(9, 12)){
+for(i in c(12)){
   column = names(temp[i])
-  k.demo = kruskal.test(Simpson ~ as.factor(temp[,i]), data = temp)$"p.value"
+  k.demo = kruskal.test(ef.sha ~ as.factor(temp[,i]), data = temp)$"p.value"
   results = data.frame(otu = paste(column), pval = as.numeric(paste(k.demo)))
   alpha.kw = rbind(alpha.kw, results)
 }
 
 alpha.kw$p.ad = p.adjust(alpha.kw$pval, method = "bonferroni")
+alpha.kw
 
 avg = temp %>%
   group_by(Pop_size) %>%
-  summarise(simp = mean(Simpson))
+  summarise(simp = mean(ef.sha))
 avg
 
-# Beta diversity with bray ------------------------------------------------
-library(vegan)
-otu2 = data.frame(otu_table(d_r))
-otu2 = decostand(otu2, method = "hellinger")
-rowSums(otu2)
-otu2 = otu2[rowSums(otu2) > 0,]
-otu2 = otu_table(as.matrix(otu2), taxa_are_rows = F)
+# ANCOM (Analysis of composition of microbiome)-------------------------------------------------------------------
 
-d3 = merge_phyloseq(tax2, otu2, sample_data(d))
-rel_otu_code = data.frame(otu_table(d3))
+d.an = d_r
+d.an = tax_glom(d_r, taxrank = "Family")
+tax.an <- as(tax_table(d.an),"matrix")
+tax.an <- as.data.frame(tax.an)
+otu.hm = merge(t(as.data.frame(otu_table(d.an))), tax.an, by = "row.names")
+#gen_f = merge(gen_f, sim.kw.popsize, by.x = "Row.names", by.y = "otu")
+otu.hm$rank = paste(as.character(otu.hm$Row.names),"|",substr(otu.hm$Family, 3, 5))
+row.names(otu.hm) = otu.hm$rank
+drops <- c("Row.names", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "rank")
+otu.hm = otu.hm[ , !(names(otu.hm) %in% drops)]
+otu.hm = data.frame(t(otu.hm))  ##columns = OTUs and should be counts
 
-dist_w = vegdist(rel_otu_code, method = "bray")
+ancom.otu = merge(otu.hm, sample_data(d.an), by = "row.names")
+row.names(ancom.otu) = ancom.otu$Code
+ancom.otu = ancom.otu[,-1]
+names(ancom.otu)
+##look for the grouping variable you want to use
+ancom.fin = ancom.otu[, grepl("otu", names(ancom.otu))|grepl("Stage", names(ancom.otu))]
 
-###PERMANOVA
-
-###Weighted distance
-
-a = adonis2(dist_w ~ sample_data(d3)$Pop_size + sample_data(d3)$Stage, permutations = 999)
-a
-
-###ajust P-values
-p.adjust(a$`Pr(>F)`, method = "bonferroni")
-
-###Do the hierarchial clustering by compressing the
-#phyloseq object at level which is significantly different
-
-sample_data(d_r)$int = paste(sample_data(d_r)$Stage,".",sample_data(d_r)$replicate)
-sample_data(d_r)$int = gsub(" ", "", sample_data(d_r)$int)
-d2 = merge_samples(d_r, "int")
-otu3 = data.frame(otu_table(d2))
-otu3 = decostand(otu3, method = "hellinger")
-rowSums(otu3)
-otu3 = round(otu3, 2)
-
-dist_uw_int = vegdist(otu3, method = "bray", binary = TRUE)
-dist_w_int = vegdist(otu3, method = "bray")
-
-otu3 = otu_table(as.matrix(otu3), taxa_are_rows = F)
-d4 = merge_phyloseq(tax2, otu_table(as.matrix(otu3), 
-                                    taxa_are_rows = F), sample_data(d2))
-
-#weighted distance analysis
-h = hclust(dist_w_int, method = "average")
-
-dhc <- as.dendrogram(h) %>% set("labels_cex", 0.5)
-ggd1 <- as.ggdend(dhc)
-
-p1 = ggplot(ggd1, horiz = TRUE,theme = theme_minimal())
-p1
-
-p2 = ggplot(ggd1, horiz = TRUE,theme = theme_minimal())
-p2
-
-p3 = ggplot(ggd1, horiz = TRUE,theme = theme_minimal())
-p3
-
-ggpubr::ggarrange(p1, p2, p3, ncol = 3)
-
-colfunc <- colorRampPalette(c("grey", "black"))
-library(gplots)
-g1 = heatmap.2(as.matrix(otu3), 
-               Rowv = as.dendrogram(h), margins = c(5, 5), col = colfunc(50), 
-               xlab = "Weighted Bray Curtis dissimilarity distances",
-               trace = "none",
-               cellnote = otu3, notecex=1.0,
-               notecol="white")
-
-# PCoA with bray --------------------------------------------------------------------
-
-state_col_ord = scale_color_manual(values=c("red", "black", "green", 
-                                            "magenta", "blue2", "yellow1", "dodgerblue1", "orangered4"))
-
-####Weighted
-
-pc = capscale(dist_w ~ 1, comm = rel_otu_code) ###~ means function of nothing
-pc$CA$eig
-s = summary(pc)
-cap = data.frame(pc$CA$u)
-plot(cap[,1], cap[,2])
-cap = merge(sample_data(d), cap, by = "row.names")
-#cap$Population = cap$Row.names
-label = cap$int
-
-p = ggplot(cap, aes(x= MDS1, y= MDS2))+theme_bw(base_size = 15) +
-  geom_point(aes(color = Year), size=2) + state_col_ord +
-  labs(x = paste("Axis 1 (", round(s$cont$importance[2,1]*100, digits =2), "%)", sep = ''),
-       y = paste("Axis 2 (", round(s$cont$importance[2,2]*100, digits =2), "%)", sep = ''))
-p
-
-# Relative abundance at phylum level --------------------------------------
-
-d_f = tax_glom(d_r, taxrank = "Phylum")
-d_f = merge_samples(d_f, "pop.year")
-gen_f = data.frame(otu_table(d_f))
-gen_f = t(gen_f)
-gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
-gen_f$rank = as.character(gen_f$Phylum)
-#gen_f$rank = paste(as.character(gen_f$Row.names), "_", gen_f$Family)
-list = as.character(gen_f$rank)
-list = paste(list, "_", rep(1:length(list)), sep = "")
-gen_f = gen_f[,-1]
-drops <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "rank")
-gen_f = gen_f[ , !(names(gen_f) %in% drops)]
-gen_f = data.frame(t(gen_f))
-gen_f = gen_f/rowSums(gen_f)
-names(gen_f) = list
-#gen_f[is.na(gen_f)] <- 0
-
-#met$Sample = ordered(met$Sample, levels = c("A", "B", "C", "D", "E", "F", "G"))
-who = names(sort(colMeans(gen_f), decreasing = TRUE))
-f = gen_f[,names(gen_f) %in% who]
-f$Other = 1-rowSums(f)
-who = c(who, "Other")
-dd = f
-dd$sl = row.names(dd)
-m = melt(dd, id.vars = c("sl"), measure.vars = who)
-library(RColorBrewer)
-state_col2 = scale_fill_manual(name = "Phylum", values=c("blue2", "black","yellow1",
-                                                         "dodgerblue1", "orangered4", "yellow4", "deeppink4", 
-                                                         "slategray4", "seagreen4" , "aquamarine",
-                                                         "tomato2", brewer.pal(n = 8, name = "Accent")))
-
-library(scales)
-
-p.phy = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
-  theme_bw(base_size = 20) + state_col2 + xlab("Sample") + ylab("Relative Abundance") + theme(axis.text.x = element_text(angle = 45, hjust = 0.9, size = 10, color = "black")) +
-  theme(legend.text = element_text(face = "italic", size = 10)) + guides(fill = guide_legend(ncol = 1, reverse=T, keywidth = 0.8, keyheight = 0.8))+ scale_y_continuous(labels = percent_format())
-p.phy$data$variable = factor(p.phy$data$variable, ordered = TRUE, levels = rev(who))
-
-p.phy
-filenm = paste(unique(sample_data(d_r)$Species),".root.phy.ra.png")
-ggsave(p.phy, width = 7, height = 4, units = "in", file = filenm)
-
-# Realtive abundance plots at Family level ------------------------------------------------
-
-d_f = tax_glom(d_r, taxrank = "Family")
-d_f = merge_samples(d_f, "pop.year")
-gen_f = data.frame(otu_table(d_f))
-gen_f = t(gen_f)
-gen_f = merge(gen_f, tax_table(d_f), by = "row.names")
-gen_f$rank = as.character(gen_f$Family)
-#gen_f$rank = paste(as.character(gen_f$Row.names), "_", gen_f$Family)
-gen_f$rank = ifelse(gen_f$Phylum == "unidentified", paste(as.character(gen_f$Kingdom), as.character(gen_f$Phylum), sep = ";"), gen_f$rank)
-gen_f$rank = ifelse(gen_f$Phylum != "unidentified" &  gen_f$Class == "unidentified", paste(as.character(gen_f$Phylum), as.character(gen_f$Class), sep = ";"), gen_f$rank)
-gen_f$rank = ifelse(gen_f$Class != "unidentified" &  gen_f$Order == "unidentified", paste(as.character(gen_f$Class), as.character(gen_f$Order), sep = ";"), gen_f$rank)
-gen_f$rank = ifelse(gen_f$Order != "unidentified" &  gen_f$Family == "unidentified", paste(as.character(gen_f$Order), as.character(gen_f$Family), sep = ";"), gen_f$rank)
-list = as.character(gen_f$rank)
-list = paste(list, "_", rep(1:length(list)), sep = "")
-gen_f = gen_f[,-1]
-drops <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "rank")
-gen_f = gen_f[ , !(names(gen_f) %in% drops)]
-gen_f = data.frame(t(gen_f))
-gen_f = gen_f/rowSums(gen_f)
-names(gen_f) = list
-#met$Sample = ordered(met$Sample, levels = c("A", "B", "C", "D", "E", "F", "G"))
-who = names(sort(colMeans(gen_f), decreasing = TRUE))[1:25]
-f = gen_f[,names(gen_f) %in% who]
-f$Other = 1-rowSums(f)
-who = c(who, "Other")
-dd = f
-dd$sl = row.names(dd)
-m = melt(dd, id.vars = c("sl"), measure.vars = who)
-library(RColorBrewer)
-state_col2 = scale_fill_manual(name = "Family", values=c("azure3", "burlywood1", "coral2", "wheat4", "violetred4", "turquoise3", "hotpink", "tan2", 
-                                                         "springgreen2", "slateblue2", "red3", "navyblue", "pink1", 
-                                                         "magenta", "olivedrab1", "blue2", "black", "yellow1",
-                                                         "dodgerblue1", "orangered4", "yellow4", "deeppink4", 
-                                                         "slategray4", "seagreen4" , "aquamarine",
-                                                         "tomato2"))
-library(scales)
-
-p = ggplot(m, aes(sl, fill = variable)) + geom_bar(aes(weight = value)) +
-  theme_bw(base_size = 20) + state_col2 + xlab("Sample") + ylab("Relative Abundance") + theme(axis.text.x = element_text(angle = 45, hjust = 0.5, size = 6, color = "black")) +
-  theme(legend.text = element_text(face = "italic", size = 6)) + guides(fill = guide_legend(ncol = 1, reverse=T, keywidth = 0.5, keyheight = 0.5))+ scale_y_continuous(labels = percent_format())
-p$data$variable = factor(p$data$variable, ordered = TRUE, levels = rev(who))
-
-p
-
-filenm = paste(unique(sample_data(d_r)$Species),".root.fam.ra.png")
-ggsave(p, width = 7, height = 4, units = "in", file = filenm)
+library(ancom.R)
+anc = ANCOM(ancom.fin, sig = 0.05)
+anc$detected
+plot_ancom(anc)
